@@ -19,7 +19,8 @@
 #define COLOR_NORMAL_CAR_2 4
 #define COLOR_NORMAL_CAR_3 5
 
-
+#define MAX_TREES 10  // Add this with color pair definition
+#define COLOR_TREE COLOR_GREEN  // Define tree color
 // Game Mechanics
 #define BASE_TIME 40
 #define EXTRA_TIME 30
@@ -47,6 +48,13 @@ typedef struct {
 typedef struct {
     int x, y;
     char symbol;
+    int active;
+    int color;
+} Tree;
+
+typedef struct {
+    int x, y;
+    char symbol;
     int color;
 } Frog;
 
@@ -65,8 +73,10 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned);
 void moveCars(Car* cars, Window* playwin);
 void drawCars(Car* cars, Window* playwin);
 void initFrog(Frog* frog, int play_width);
-void moveFrog(Frog* frog, int ch);
+void moveFrog(Frog* frog, int ch, Tree* trees);
+
 void drawFrog(Frog* frog, Window* playwin);
+void initializeTrees(Tree* trees, int playHeight);
 int checkCollision(Frog* frog, Car* cars);
 int randomSpeed(int level);
 int randomSpeedBonusCar();
@@ -131,6 +141,33 @@ int randomSpeedBonusCar() {
 }
 
 
+void initializeTrees(Tree* trees, int playHeight) {
+    srand(time(NULL));
+    for (int i = 0; i < MAX_TREES; i++) {
+        trees[i].active = 0;  // Reset all trees
+    }
+    
+    int trees_to_place = 3 + rand() % 3;  // 3-5 trees
+    for (int i = 0; i < trees_to_place; i++) {
+        int index = rand() % MAX_TREES;
+        trees[index].x = 1 + rand() % (PLAY_WIDTH - 3);
+        trees[index].y = 1 + rand() % (playHeight - 2);
+        trees[index].symbol = 'T';  // More tree-like symbol
+        trees[index].active = 1;
+        trees[index].color = COLOR_TREE;
+    }
+}
+
+void drawTrees(Tree* trees, Window* playwin) {
+    for (int i = 0; i < MAX_TREES; i++) {
+        if (trees[i].active) {
+            wattron(playwin->win, COLOR_PAIR(trees[i].color));
+            mvwprintw(playwin->win, trees[i].y, trees[i].x, "%c", trees[i].symbol);
+            wattroff(playwin->win, COLOR_PAIR(trees[i].color));
+        }
+    }
+}
+
 
 void stats(int position_x, int position_y, int remaining_time) {
     int row = position_y;
@@ -171,13 +208,15 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned) {
     int middle_lane = playHeight / 2;
     time_t current_time = time(NULL);
     int elapsed_time = (int)difftime(current_time, start_time);
-    // Spawn regular cars
+
+    // Regular car spawning
     if (rand() % 100 < CAR_SPAWN_CHANCE) {
         for (int i = 0; i < total_cars; i++) {
-            if (!cars[i].active && cars[i].y != middle_lane) {
+            if (!cars[i].active) {
                 cars[i].x = PLAY_WIDTH - 2;
                 cars[i].y = 1 + rand() % (playHeight - 2);
-                
+
+                // Ensure the car does not spawn in the middle lane
                 if (cars[i].y != middle_lane) {
                     cars[i].speed = randomSpeed(level);
                     cars[i].active = 1;
@@ -186,22 +225,23 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned) {
             }
         }
     }
-    
-    // Spawn bonus car in the middle lane only once per level
+
+    // Bonus car spawning (one per level, after 7 seconds)
     if (!*bonus_car_spawned && elapsed_time >= 7) {
         for (int i = 0; i < total_cars; i++) {
             if (!cars[i].active) {
                 cars[i].x = PLAY_WIDTH - 2;
-                cars[i].y = middle_lane;
+                cars[i].y = middle_lane; // Middle lane only
                 cars[i].speed = randomSpeedBonusCar();
                 cars[i].color = COLOR_BONUS_CAR;
                 cars[i].active = 1;
-                *bonus_car_spawned = 1;  // Mark bonus car as spawned
+                *bonus_car_spawned = 1; // Mark bonus car as spawned
                 break;
             }
         }
     }
 }
+
 
 
 
@@ -233,16 +273,30 @@ void initFrog(Frog* frog, int play_width) {
     frog->symbol = '^';
     frog->color = COLOR_FROG;
 }
+void moveFrog(Frog* frog, int ch, Tree* trees) {
+    int new_x = frog->x, new_y = frog->y;
 
-void moveFrog(Frog* frog, int ch) {
     switch(ch) {
-        case 'w': frog->y = (frog->y > 1) ? frog->y - 1 : frog->y; break;
-        case 's': frog->y = (frog->y < WINDOW_HEIGHT - 2) ? frog->y + 1 : frog->y; break;
-        case 'a': frog->x = (frog->x > 1) ? frog->x - 1 : frog->x; break;
-        case 'd': frog->x = (frog->x < PLAY_WIDTH - 2) ? frog->x + 1 : frog->x; break;
+        case 'w': new_y = (frog->y > 1) ? frog->y - 1 : frog->y; break;
+        case 's': new_y = (frog->y < WINDOW_HEIGHT - 2) ? frog->y + 1 : frog->y; break;
+        case 'a': new_x = (frog->x > 1) ? frog->x - 1 : frog->x; break;
+        case 'd': new_x = (frog->x < PLAY_WIDTH - 2) ? frog->x + 1 : frog->x; break;
+    }
+
+    // Check for tree collision
+    int can_move = 1;
+    for (int i = 0; i < MAX_TREES; i++) {
+        if (trees[i].active && trees[i].x == new_x && trees[i].y == new_y) {
+            can_move = 0;
+            break;
+        }
+    }
+
+    if (can_move) {
+        frog->x = new_x;
+        frog->y = new_y;
     }
 }
-
 void drawFrog(Frog* frog, Window* playwin) {
     wattron(playwin->win, COLOR_PAIR(frog->color));
     mvwaddch(playwin->win, frog->y, frog->x, frog->symbol);
@@ -267,71 +321,55 @@ int main() {
     // Initialize game components
     Car cars[MAX_CARS];
     Frog frog;
+    Tree trees[MAX_TREES] = {0};
     
     initializeCars(cars, WINDOW_HEIGHT, level);
+    initializeTrees(trees, WINDOW_HEIGHT);
     initFrog(&frog, PLAY_WIDTH);
-    int bonus_car_spawned = 0;  // Add this line
 
     start_time = time(NULL);
-    int middle_lane_time = 0;
     int game_running = 1;
+    int bonus_car_spawned = 0;
+    int bonus_time = 0;  // Zmienna przechowująca dodatkowy czas
 
     while (game_running) {
-        // Clear play window
+        // Clean and prepare windows
         CleanWin(playwin, 1);
+        CleanWin(statwin, 1);
 
-        // Spawn cars
-        spawnCars(cars, WINDOW_HEIGHT, level, &bonus_car_spawned);
+        // Calculate remaining time
+        int remaining_time = timer(start_time, level, bonus_time);
+        
+        // Update stats window
+        mvwprintw(statwin->win, 2, 2, "Level: %d", level);
+        mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL);
+        mvwprintw(statwin->win, 4, 2, "Time Left: %d sec", remaining_time);
+        
+        wrefresh(statwin->win);
 
-        // Move cars
+        // Game mechanics
+        spawnCars(cars, WINDOW_HEIGHT, level, &bonus_car_spawned);        
         moveCars(cars, playwin);
-
-        // Draw cars
         drawCars(cars, playwin);
-
-        // Draw frog
+        drawTrees(trees, playwin);
         drawFrog(&frog, playwin);
 
-        // Game logic
+        // Player input
         int ch = wgetch(playwin->win);
-        moveFrog(&frog, ch);
+        moveFrog(&frog, ch, trees);
 
-        // Check for level progression
-        if (frog.y == 1) {
-            bonus_car_spawned = 0;  // Reset bonus car spawn flag
-
-            level++;
-            // Reset frog position
-            initFrog(&frog, PLAY_WIDTH);
-            
-            // Reinitialize cars with new level
-            initializeCars(cars, WINDOW_HEIGHT, level);
-            
-            // Reset start time
-            start_time = time(NULL);
-            middle_lane_time = 0;
-            
-            // Show level progression screen
-            clear();
-            mvprintw(LINES/2, COLS/2 - 10, "Next Level: %d!", level);
-            refresh();
-            napms(500);  // Skrócony czas wyświetlania
-            clear();     // Czyszczenie ekranu
-            refresh();   // Odświeżenie ekranu
-        }
-
-        // Check for collision with middle lane bonus car
+        // Check for collision with bonus car
         int middle_lane = WINDOW_HEIGHT / 2;
         for (int i = 0; i < MAX_CARS; i++) {
-            if (cars[i].active && 
-                cars[i].y == middle_lane && 
-                cars[i].x == frog.x && 
+            if (cars[i].active &&
+                cars[i].y == middle_lane &&
+                cars[i].x == frog.x &&
                 frog.y == middle_lane) {
-                
-                // Dodaj czas tylko na środkowym pasie
-                middle_lane_time += EXTRA_TIME;
-                
-                // Dezaktywuj auto
+
+                // Add extra time for bonus car interaction
+                bonus_time += EXTRA_TIME;
+
+                // Deactivate the bonus car
                 cars[i].active = 0;
                 break;
             }
@@ -340,29 +378,39 @@ int main() {
         // Check for collision with other cars
         if (checkCollision(&frog, cars)) {
             game_running = 0;
+            break;
         }
 
-        // Update timer and stats
-        int remaining_time = timer(start_time, level, middle_lane_time);
-        
-        if (remaining_time <= 0) {
-            game_running = 0;
+        // Level progression
+        if (frog.y == 1) {
+            level++;
+            initFrog(&frog, PLAY_WIDTH);
+            initializeCars(cars, WINDOW_HEIGHT, level);
+            initializeTrees(trees, WINDOW_HEIGHT);
+            start_time = time(NULL);
+            bonus_car_spawned = 0;
+            bonus_time = 0;  // Reset bonus time for the new level
+            
+            clear();
+            mvprintw(LINES/2, COLS/2 - 10, "Next Level: %d!", level);
+            refresh();
+            napms(500);
+            clear();
+            refresh();
         }
-
-        // Display stats
-        stats_x = PLAY_WIDTH + 5;
-        stats_y = 5;
-        stats(stats_x, stats_y, remaining_time);
-
-        // Refresh windows
-        wrefresh(playwin->win);
-        wrefresh(statwin->win);
-
-        // Control game speed
-        napms(100);
 
         // Quit condition
         if (ch == 'q' || ch == 'Q') {
+            game_running = 0;
+        }
+
+        // Refresh windows and add delay
+        wrefresh(playwin->win);
+        wrefresh(statwin->win);
+        napms(100);
+
+        // Time-out condition
+        if (remaining_time <= 0) {
             game_running = 0;
         }
     }
