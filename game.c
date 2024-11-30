@@ -9,8 +9,8 @@
 #define STATS_WIDTH 30
 #define MIN_WIDTH 50
 #define MIN_HEIGHT 25
-#define MAX_CARS 10
-#define CAR_SPAWN_CHANCE 20
+#define MAX_CARS 20  // Increased max cars
+#define CAR_SPAWN_CHANCE 30  // Increased spawn chance
 
 // Color Pair Definitions
 #define COLOR_FROG 1
@@ -19,9 +19,12 @@
 #define COLOR_NORMAL_CAR_2 4
 #define COLOR_NORMAL_CAR_3 5
 
+
 // Game Mechanics
 #define BASE_TIME 40
 #define EXTRA_TIME 30
+#define BASE_LEVEL_CARS 20
+#define CARS_PER_LEVEL 10
 
 // Structs
 typedef struct {
@@ -52,50 +55,25 @@ int level = 1;
 int stats_x, stats_y;
 time_t start_time;
 
-// Color Map
-const char* color_map[] = {"R", "B", "G", "Y", "C", "M"};
-
-// Function Prototypes
+// Full function prototypes
 WINDOW* Start();
 Window* Init(WINDOW* parent, int y, int x, int width, int color, int bo, int delay);
 void CleanWin(Window* W, int bo);
-
-// Car Functions
-void initializeCars(Car* cars, int playHeight);
-void spawnCars(Car* cars, int playHeight, int level);
+void initializeCars(Car* cars, int playHeight, int currentLevel);
+// Replace the existing prototype with:
+void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned);
 void moveCars(Car* cars, Window* playwin);
 void drawCars(Car* cars, Window* playwin);
-
-// Frog Functions
 void initFrog(Frog* frog, int play_width);
 void moveFrog(Frog* frog, int ch);
 void drawFrog(Frog* frog, Window* playwin);
 int checkCollision(Frog* frog, Car* cars);
+int randomSpeed(int level);
+int randomSpeedBonusCar();
+void stats(int position_x, int position_y, int remaining_time);
+int timer(time_t start_time, int current_level, int middle_lane_time);
 
-// Game Mechanics Functions
-int randomSpeed(int level) {
-    int base_speed = (level - 1) * 2 + 1;
-    int max_speed = base_speed + 2;
-    return base_speed + rand() % (max_speed - base_speed + 1);
-}
-
-void stats(int position_x, int position_y, int remaining_time) {
-    int row = position_y;
-    mvprintw(row--, position_x, "Level: %d", level);
-    mvprintw(row--, position_x, "Cars: %d", MAX_CARS);
-    mvprintw(row--, position_x, "Time Left: %d sec", remaining_time);
-}
-
-int timer(time_t start_time, int current_level, int middle_lane_time) {
-    time_t current_time = time(NULL);
-    int base_time = BASE_TIME;
-    int elapsed_time = (int)difftime(current_time, start_time);
-    int remaining_time = base_time - elapsed_time - middle_lane_time;
-    
-    return (remaining_time > 0) ? remaining_time : 0;
-}
-
-// Initialization Functions
+// Function Implementations
 WINDOW* Start() {
     initscr();
     noecho();
@@ -140,11 +118,119 @@ void CleanWin(Window* W, int bo) {
     wrefresh(W->win);
 }
 
-// Frog Functions
+int randomSpeed(int level) {
+    int base_speed = (level * 2);  // Increased base speed scaling
+    int max_speed = base_speed + 3;
+    return base_speed + rand() % (max_speed - base_speed + 1);
+}
+
+int randomSpeedBonusCar() {
+    int base_speed = 1;  // Increased base speed scaling
+    int max_speed = 2;
+    return base_speed + rand() % (max_speed - base_speed + 1);
+}
+
+
+
+void stats(int position_x, int position_y, int remaining_time) {
+    int row = position_y;
+    mvprintw(row--, position_x, "Level: %d", level);
+    mvprintw(row--, position_x, "Cars: %d", BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL);
+    mvprintw(row--, position_x, "Time Left: %d sec", remaining_time);
+}
+
+int timer(time_t start_time, int current_level, int middle_lane_extra_time) {
+    time_t current_time = time(NULL);
+    int base_time = BASE_TIME + (current_level - 1) * 5;  // More time per level
+    int elapsed_time = (int)difftime(current_time, start_time);
+    int remaining_time = base_time + middle_lane_extra_time - elapsed_time;
+    
+    return (remaining_time > 0) ? remaining_time : 0;
+}
+
+
+void initializeCars(Car* cars, int playHeight, int currentLevel) {
+    srand(time(NULL));
+    int total_cars = BASE_LEVEL_CARS + (currentLevel - 1) * CARS_PER_LEVEL;
+    
+    for (int i = 0; i < total_cars; i++) {
+        cars[i].active = 0;
+        cars[i].symbol = '-';
+        
+        // Assign random colors
+        switch(rand() % 3) {
+            case 0: cars[i].color = COLOR_NORMAL_CAR_1; break;
+            case 1: cars[i].color = COLOR_NORMAL_CAR_2; break;
+            case 2: cars[i].color = COLOR_NORMAL_CAR_3; break;
+        }
+    }
+}
+
+void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned) {
+    int total_cars = BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL;
+    int middle_lane = playHeight / 2;
+    time_t current_time = time(NULL);
+    int elapsed_time = (int)difftime(current_time, start_time);
+    // Spawn regular cars
+    if (rand() % 100 < CAR_SPAWN_CHANCE) {
+        for (int i = 0; i < total_cars; i++) {
+            if (!cars[i].active && cars[i].y != middle_lane) {
+                cars[i].x = PLAY_WIDTH - 2;
+                cars[i].y = 1 + rand() % (playHeight - 2);
+                
+                if (cars[i].y != middle_lane) {
+                    cars[i].speed = randomSpeed(level);
+                    cars[i].active = 1;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Spawn bonus car in the middle lane only once per level
+    if (!*bonus_car_spawned && elapsed_time >= 7) {
+        for (int i = 0; i < total_cars; i++) {
+            if (!cars[i].active) {
+                cars[i].x = PLAY_WIDTH - 2;
+                cars[i].y = middle_lane;
+                cars[i].speed = randomSpeedBonusCar();
+                cars[i].color = COLOR_BONUS_CAR;
+                cars[i].active = 1;
+                *bonus_car_spawned = 1;  // Mark bonus car as spawned
+                break;
+            }
+        }
+    }
+}
+
+
+
+void moveCars(Car* cars, Window* playwin) {
+    for (int i = 0; i < MAX_CARS; i++) {
+        if (cars[i].active) {
+            cars[i].x -= cars[i].speed;
+            
+            if (cars[i].x <= 1) {
+                cars[i].active = 0;
+            }
+        }
+    }
+}
+
+void drawCars(Car* cars, Window* playwin) {
+    for (int i = 0; i < MAX_CARS; i++) {
+        if (cars[i].active) {
+            wattron(playwin->win, COLOR_PAIR(cars[i].color));
+            mvwaddch(playwin->win, cars[i].y, cars[i].x, cars[i].symbol);
+            wattroff(playwin->win, COLOR_PAIR(cars[i].color));
+        }
+    }
+}
+
 void initFrog(Frog* frog, int play_width) {
     frog->x = play_width / 2;
     frog->y = WINDOW_HEIGHT - 2;  // Last line
-    frog->symbol = 'F';
+    frog->symbol = '^';
     frog->color = COLOR_FROG;
 }
 
@@ -172,82 +258,6 @@ int checkCollision(Frog* frog, Car* cars) {
     return 0;
 }
 
-// Car Functions
-void initializeCars(Car* cars, int playHeight) {
-    srand(time(NULL));
-    for (int i = 0; i < MAX_CARS; i++) {
-        cars[i].active = 0;
-        cars[i].symbol = '-';
-        
-        // Assign random colors
-        switch(rand() % 3) {
-            case 0: cars[i].color = COLOR_NORMAL_CAR_1; break;
-            case 1: cars[i].color = COLOR_NORMAL_CAR_2; break;
-            case 2: cars[i].color = COLOR_NORMAL_CAR_3; break;
-        }
-    }
-}
-
-void spawnCars(Car* cars, int playHeight, int level) {
-    // Spawn regular cars
-    if (rand() % 100 < CAR_SPAWN_CHANCE) {
-        for (int i = 0; i < MAX_CARS; i++) {
-            if (!cars[i].active) {
-                cars[i].x = PLAY_WIDTH - 2;
-                cars[i].y = 1 + rand() % (playHeight - 2);
-                cars[i].speed = randomSpeed(level);
-                cars[i].active = 1;
-                break;
-            }
-        }
-    }
-    
-    // Spawn bonus car in the middle lane
-    int middle_lane = playHeight / 2;
-    int bonus_car_exists = 0;
-    for (int i = 0; i < MAX_CARS; i++) {
-        if (cars[i].active && cars[i].y == middle_lane) {
-            bonus_car_exists = 1;
-            break;
-        }
-    }
-    
-    if (!bonus_car_exists) {
-        for (int i = 0; i < MAX_CARS; i++) {
-            if (!cars[i].active) {
-                cars[i].x = PLAY_WIDTH - 2;
-                cars[i].y = middle_lane;
-                cars[i].speed = randomSpeed(level);
-                cars[i].color = COLOR_BONUS_CAR;
-                cars[i].active = 1;
-                break;
-            }
-        }
-    }
-}
-
-void moveCars(Car* cars, Window* playwin) {
-    for (int i = 0; i < MAX_CARS; i++) {
-        if (cars[i].active) {
-            cars[i].x -= cars[i].speed;
-            
-            if (cars[i].x <= 1) {
-                cars[i].active = 0;
-            }
-        }
-    }
-}
-
-void drawCars(Car* cars, Window* playwin) {
-    for (int i = 0; i < MAX_CARS; i++) {
-        if (cars[i].active) {
-            wattron(playwin->win, COLOR_PAIR(cars[i].color));
-            mvwaddch(playwin->win, cars[i].y, cars[i].x, cars[i].symbol);
-            wattroff(playwin->win, COLOR_PAIR(cars[i].color));
-        }
-    }
-}
-
 int main() {
     WINDOW* mainwin = Start();
     
@@ -258,9 +268,10 @@ int main() {
     Car cars[MAX_CARS];
     Frog frog;
     
-    initializeCars(cars, WINDOW_HEIGHT);
+    initializeCars(cars, WINDOW_HEIGHT, level);
     initFrog(&frog, PLAY_WIDTH);
-    
+    int bonus_car_spawned = 0;  // Add this line
+
     start_time = time(NULL);
     int middle_lane_time = 0;
     int game_running = 1;
@@ -270,7 +281,7 @@ int main() {
         CleanWin(playwin, 1);
 
         // Spawn cars
-        spawnCars(cars, WINDOW_HEIGHT, level);
+        spawnCars(cars, WINDOW_HEIGHT, level, &bonus_car_spawned);
 
         // Move cars
         moveCars(cars, playwin);
@@ -285,12 +296,42 @@ int main() {
         int ch = wgetch(playwin->win);
         moveFrog(&frog, ch);
 
+        // Check for level progression
+        if (frog.y == 1) {
+            bonus_car_spawned = 0;  // Reset bonus car spawn flag
+
+            level++;
+            // Reset frog position
+            initFrog(&frog, PLAY_WIDTH);
+            
+            // Reinitialize cars with new level
+            initializeCars(cars, WINDOW_HEIGHT, level);
+            
+            // Reset start time
+            start_time = time(NULL);
+            middle_lane_time = 0;
+            
+            // Show level progression screen
+            clear();
+            mvprintw(LINES/2, COLS/2 - 10, "Next Level: %d!", level);
+            refresh();
+            napms(500);  // Skrócony czas wyświetlania
+            clear();     // Czyszczenie ekranu
+            refresh();   // Odświeżenie ekranu
+        }
+
         // Check for collision with middle lane bonus car
         int middle_lane = WINDOW_HEIGHT / 2;
         for (int i = 0; i < MAX_CARS; i++) {
-            if (cars[i].active && cars[i].y == middle_lane && 
-                cars[i].x == frog.x && frog.y == middle_lane) {
+            if (cars[i].active && 
+                cars[i].y == middle_lane && 
+                cars[i].x == frog.x && 
+                frog.y == middle_lane) {
+                
+                // Dodaj czas tylko na środkowym pasie
                 middle_lane_time += EXTRA_TIME;
+                
+                // Dezaktywuj auto
                 cars[i].active = 0;
                 break;
             }
@@ -328,7 +369,8 @@ int main() {
 
     // Game over screen
     clear();
-    mvprintw(LINES/2, COLS/2 - 10, "Game Over! Level: %d", level);
+    mvprintw(LINES/2 - 1, COLS/2 - 10, "Game Over!");
+    mvprintw(LINES/2, COLS/2 - 10, "Final Level: %d", level);
     refresh();
     getch();
 
