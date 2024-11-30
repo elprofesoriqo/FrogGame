@@ -311,6 +311,16 @@ int checkCollision(Frog* frog, Car* cars) {
     }
     return 0;
 }
+int countActiveTrees(Tree* trees) {
+    int count = 0;
+    for (int i = 0; i < MAX_TREES; i++) {
+        if (trees[i].active) {
+            count++;
+        }
+    }
+    return count;
+}
+
 
 int main() {
     WINDOW* mainwin = Start();
@@ -343,7 +353,8 @@ int main() {
         // Update stats window
         mvwprintw(statwin->win, 2, 2, "Level: %d", level);
         mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL);
-        mvwprintw(statwin->win, 4, 2, "Time Left: %d sec", remaining_time);
+        mvwprintw(statwin->win, 4, 2, "Trees: %d", countActiveTrees(trees));
+        mvwprintw(statwin->win, 5, 2, "Time Left: %d sec", remaining_time);
         
         wrefresh(statwin->win);
 
