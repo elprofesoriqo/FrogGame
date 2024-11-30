@@ -1,0 +1,11 @@
+wsl -d ubuntu
+sudo apt-get install libncurses5-dev
+
+cd desktop
+cd zaba
+
+
+chmod +x game.sh
+./game.sh
+
+
