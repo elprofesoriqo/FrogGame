@@ -10,6 +10,8 @@
 #include "structures.h"
 #include "window.h"
 
+#define MAX_LEADERBOARD_ENTRIES 10
+#define LEADERBOARD_FILE "leaderboard.txt"
 
 
 int getColorFromName(const char* colorName) {
@@ -81,6 +83,56 @@ int readColorConfig(ColorConfig* config) {
 
     fclose(file);
     return 1;
+}
+
+
+// Function to save score to leaderboard
+void saveToLeaderboard(int points, int level) {
+    FILE* file = fopen(LEADERBOARD_FILE, "a+");
+    if (file == NULL) {
+        perror("Error opening leaderboard file");
+        return;
+    }
+
+    // Get current time
+    time_t current_time;
+    struct tm* time_info;
+    time(&current_time);
+    time_info = localtime(&current_time);
+
+    // Format: points level timestamp
+    fprintf(file, "%d %d %04d-%02d-%02d %02d:%02d:%02d\n", 
+        points, 
+        level,
+        time_info->tm_year + 1900, 
+        time_info->tm_mon + 1, 
+        time_info->tm_mday,
+        time_info->tm_hour, 
+        time_info->tm_min, 
+        time_info->tm_sec);
+
+    fclose(file);
+}
+
+// Function to read leaderboard entries
+int readLeaderboardEntries(LeaderboardEntry* entries) {
+    FILE* file = fopen(LEADERBOARD_FILE, "r");
+    if (file == NULL) {
+        return 0;
+    }
+
+    int entry_count = 0;
+    while (fscanf(file, "%d %d %s %s", 
+        &entries[entry_count].points, 
+        &entries[entry_count].level,
+        entries[entry_count].date,
+        entries[entry_count].time) == 4 && 
+        entry_count < MAX_LEADERBOARD_ENTRIES) {
+        entry_count++;
+    }
+
+    fclose(file);
+    return entry_count;
 }
 
 

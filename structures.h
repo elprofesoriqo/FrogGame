@@ -81,4 +81,10 @@ typedef struct {
 } ColorConfig;
 
 
+typedef struct {
+    int points;
+    int level;
+    char date[20];
+    char time[20];
+} LeaderboardEntry;
 #endif

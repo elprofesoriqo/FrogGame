@@ -98,6 +98,58 @@ int countActiveTrees(Tree* trees) {
     return count;
 }
 
+void displayLeaderboard() {
+    LeaderboardEntry entries[MAX_LEADERBOARD_ENTRIES];
+    int entry_count = readLeaderboardEntries(entries);
+
+    // Sort entries by points (bubble sort)
+    for (int i = 0; i < entry_count - 1; i++) {
+        for (int j = 0; j < entry_count - i - 1; j++) {
+            if (entries[j].points < entries[j+1].points) {
+                LeaderboardEntry temp = entries[j];
+                entries[j] = entries[j+1];
+                entries[j+1] = temp;
+            }
+        }
+    }
+
+    // Clear screen for leaderboard
+    clear();
+    mvprintw(2, COLS/2 - 10, "LEADERBOARD");
+    mvprintw(3, COLS/2 - 15, "----------------------------");
+
+    // Display entries
+    for (int i = 0; i < entry_count && i < 10; i++) {
+        mvprintw(5 + i, COLS/2 - 15, "%d. Points: %d | Level: %d | %s %s", 
+                 i+1, 
+                 entries[i].points, 
+                 entries[i].level, 
+                 entries[i].date, 
+                 entries[i].time);
+    }
+
+    // If no entries
+    if (entry_count == 0) {
+        mvprintw(LINES/2, COLS/2 - 10, "No scores yet!");
+    }
+
+    mvprintw(LINES - 3, COLS/2 - 15, "Press 'ENTER' to continue...");
+    refresh();
+    
+    // Wait specifically for ENTER key
+    nodelay(stdscr, FALSE);
+    int ch;
+    while ((ch = getch()) != '\n' && ch != '\r') {
+        // Wait for ENTER key
+    }
+    
+    // Clear screen completely
+    clear();
+    refresh();
+    
+    // Return to non-blocking input
+    nodelay(stdscr, TRUE);
+}
 
 
 void stats(Window * statwin, int remaining_time, GameState * game_state) {
@@ -105,6 +157,7 @@ void stats(Window * statwin, int remaining_time, GameState * game_state) {
     mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (game_state->level - 1) * CARS_PER_LEVEL);
     mvwprintw(statwin->win, 5, 2, "Time Left: %d sec", remaining_time);
     mvwprintw(statwin->win, 6, 2, "Points: %d", game_state->total_points);
+    mvwprintw(statwin->win, 7, 2, "Igor Jankowski s203396");
 }
 
 
@@ -219,11 +272,27 @@ int runGame(WINDOW* mainwin, GameState* game_state) {
 
         // Player input handling
         int ch = wgetch(playwin->win);
-        
+        switch(ch) {
+            case 'q':
+            case 'Q':
+                game_running = 0;
+                break;
+            case 'l':
+            case 'L':
+                // Display leaderboard
+                displayLeaderboard();
+                // Redraw game screen after leaderboard
+                werase(playwin->win);
+                werase(statwin->win);
+                box(playwin->win, 0, 0);
+                box(statwin->win, 0, 0);
+                break;
+            default:
         // Handle player input
         if (!processPlayerInput(&frog, trees, ch, key_state)) {
             game_running = 0;
             break;
+        }
         }
 
         // Reset key states when no key is pressed
@@ -293,9 +362,13 @@ void displayGameOverScreen(int game_over_reason, GameState* game_state) {
     mvprintw(LINES/2, COLS/2 - 10, "Final Level: %d", game_state->level);
     mvprintw(LINES/2 + 1, COLS/2 - 10, "Total Points: %d", game_state->total_points);
     
+    // Save score to leaderboard
+    saveToLeaderboard(game_state->total_points, game_state->level);
+    
     // Display countdown
+    mvprintw(LINES/2 + 2, COLS/2 - 10, "Score saved to Leaderboard!");
     for (int i = 5; i > 0; i--) {
-        mvprintw(LINES/2 + 2, COLS/2 - 10, "Closing in %d seconds...", i);
+        mvprintw(LINES/2 + 3, COLS/2 - 10, "Closing in %d seconds...", i);
         refresh();
         napms(1000);  // 1 second delay
     }
