@@ -30,6 +30,7 @@ WINDOW* Start() {
     init_pair(COLOR_NORMAL_CAR_1, colorConfig.car_colors[0], COLOR_BLACK);
     init_pair(COLOR_NORMAL_CAR_2, colorConfig.car_colors[1], COLOR_BLACK);
     init_pair(COLOR_NORMAL_CAR_3, colorConfig.car_colors[2], COLOR_BLACK);
+    init_pair(COLOR_FRIENDLY_CAR, colorConfig.frog_color, COLOR_BLACK);
     
     cbreak();
     keypad(stdscr, TRUE);

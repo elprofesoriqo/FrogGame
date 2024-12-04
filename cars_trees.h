@@ -12,9 +12,12 @@
 #include "fileprocessing.h"
 
 
+void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, time_t start_time, int* friendly_car_spawned);
+
 // cars_trees.h
 int randomSpeed(int level);          // Add this prototype
 int randomSpeedBonusCar();      // Add this prototype
+
 
 
 void initializeCars(Car* cars, int playHeight, int currentLevel) {
@@ -24,6 +27,7 @@ void initializeCars(Car* cars, int playHeight, int currentLevel) {
     for (int i = 0; i < total_cars; i++) {
         cars[i].active = 0;
         cars[i].symbol = '-';
+        cars[i].type = CAR_NORMAL;  // Default type
         
         // Assign random colors
         switch(rand() % 3) {
@@ -34,14 +38,12 @@ void initializeCars(Car* cars, int playHeight, int currentLevel) {
     }
 }
 
-void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, time_t start_time) {
+void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, time_t start_time, int* friendly_car_spawned) {
     int total_cars = BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL;
     int middle_lane = playHeight / 2;
     time_t current_time = time(NULL);
 
-    // Używamy game_state.start_time
     int elapsed_time = (int)difftime(current_time, start_time);
-
 
     // Regular car spawning
     if (rand() % 100 < CAR_SPAWN_CHANCE) {
@@ -68,8 +70,25 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, tim
                 cars[i].y = middle_lane; // Middle lane only
                 cars[i].speed = randomSpeedBonusCar();
                 cars[i].color = COLOR_BONUS_CAR;
+                cars[i].type = CAR_BONUS;  // Set type to bonus
                 cars[i].active = 1;
                 *bonus_car_spawned = 1; // Mark bonus car as spawned
+                break;
+            }
+        }
+    }
+
+    // Friendly car spawning (one per level on levels > 2)
+    if (level > 2 && !*friendly_car_spawned && rand() % 100 < 20) {
+        for (int i = 0; i < total_cars; i++) {
+            if (!cars[i].active) {
+                cars[i].x = PLAY_WIDTH - 2;
+                cars[i].y = 1 + rand() % (playHeight - 2);
+                cars[i].speed = 1;  // Very slow
+                cars[i].color = COLOR_FRIENDLY_CAR;
+                cars[i].type = CAR_FRIENDLY;
+                cars[i].active = 1;
+                *friendly_car_spawned = 1; // Mark friendly car as spawned
                 break;
             }
         }
@@ -77,12 +96,24 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, tim
 }
 
 
-
-
-void moveCars(Car* cars, Window* playwin) {
+void moveCars(Car* cars, Frog* frog, Window* playwin) {
     for (int i = 0; i < MAX_CARS; i++) {
         if (cars[i].active) {
-            cars[i].x -= cars[i].speed;
+            // Friendly car logic
+            if (cars[i].type == CAR_FRIENDLY) {
+                // Check if frog is in the same lane
+                if (cars[i].y == frog->y) {
+                    // Stop if too close to frog
+                    if (abs(cars[i].x - frog->x) > 3) {
+                        cars[i].x -= cars[i].speed;
+                    }
+                } else {
+                    cars[i].x -= cars[i].speed;
+                }
+            } else {
+                // Normal car movement
+                cars[i].x -= cars[i].speed;
+            }
             
             if (cars[i].x <= 1) {
                 cars[i].active = 0;
@@ -107,8 +138,8 @@ void drawCars(Car* cars, Window* playwin) {
 
 
 int randomSpeed(int level) {
-    int base_speed = (level * 2);  // Increased base speed scaling
-    int max_speed = base_speed + 3;
+    int base_speed = (level + 1);  // Reduced base speed scaling
+    int max_speed = base_speed + 2;  // Reduced max speed variance
     return base_speed + rand() % (max_speed - base_speed + 1);
 }
 

@@ -53,15 +53,40 @@ void drawFrog(Frog* frog, Window* playwin) {
     wattroff(playwin->win, COLOR_PAIR(frog->color));
 }
 
+void handleBonusCar(Frog* frog, Car* cars, int middle_lane) {
+    for (int i = 0; i < MAX_CARS; i++) {
+        if (cars[i].active &&
+            cars[i].y == middle_lane &&
+            cars[i].type == CAR_BONUS && // Ensure it's a bonus car
+            cars[i].x == frog->x &&
+            frog->y == middle_lane) {
+
+            // Move frog up by 3 positions if possible
+            if (frog->y > 3) {
+                frog->y -= 3;
+            } else {
+                frog->y = 1;  // If not enough space, move to top
+            }
+
+            // Deactivate the bonus car
+            cars[i].active = 0;
+            break;
+        }
+    }
+}
+
 int checkCollision(Frog* frog, Car* cars) {
     for (int i = 0; i < MAX_CARS; i++) {
-        if (cars[i].active && cars[i].x == frog->x && cars[i].y == frog->y) {
+        if (cars[i].active && 
+            cars[i].y == frog->y && 
+            (cars[i].x == frog->x || cars[i].x == frog->x + 1 || cars[i].x == frog->x - 1) &&
+            cars[i].type != CAR_BONUS && // Ignore bonus cars
+            cars[i].type != CAR_FRIENDLY) { // Ignore friendly cars
             return 1;
         }
     }
     return 0;
 }
-
 
 int countActiveTrees(Tree* trees) {
     int count = 0;
@@ -75,16 +100,6 @@ int countActiveTrees(Tree* trees) {
 
 
 
-
-
-
-
-
-
-
-
-
-
 void stats(Window * statwin, int remaining_time, GameState * game_state) {
     mvwprintw(statwin->win, 2, 2, "Level: %d", game_state->level);
     mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (game_state->level - 1) * CARS_PER_LEVEL);
@@ -93,15 +108,14 @@ void stats(Window * statwin, int remaining_time, GameState * game_state) {
 }
 
 
-int timer(time_t start_time, int current_level, int middle_lane_extra_time) {
+int timer(time_t start_time, int current_level) {
     time_t current_time = time(NULL);
-    int base_time = BASE_TIME + (current_level - 1) * 5;  // More time per level
+    int base_time = BASE_TIME + (current_level - 1) * 10;  // 10 seconds per level
     int elapsed_time = (int)difftime(current_time, start_time);
-    int remaining_time = base_time + middle_lane_extra_time - elapsed_time;
+    int remaining_time = base_time - elapsed_time;
     
     return (remaining_time > 0) ? remaining_time : 0;
 }
-
 
 
 void initializeGameState(GameState* game_state, int initial_level) {
@@ -138,27 +152,6 @@ void updateGameLevel(GameState* game_state, Frog* frog, Car* cars, Tree* trees, 
     refresh();
 }
 
-void handleBonusCar(Frog* frog, Car* cars, int middle_lane) {
-    for (int i = 0; i < MAX_CARS; i++) {
-        if (cars[i].active &&
-            cars[i].y == middle_lane &&
-            cars[i].x == frog->x &&
-            frog->y == middle_lane) {
-
-            // Move frog up by 3 positions if possible
-            if (frog->y > 3) {
-                frog->y -= 3;
-            } else {
-                frog->y = 1;  // If not enough space, move to top
-            }
-
-            // Deactivate the bonus car
-            cars[i].active = 0;
-            break;
-        }
-    }
-    return;
-}
 
 int processPlayerInput(Frog* frog, Tree* trees, int ch, int* key_state) {
     if (ch == 'q' || ch == 'Q') {
@@ -179,10 +172,11 @@ int processPlayerInput(Frog* frog, Tree* trees, int ch, int* key_state) {
     return 1;  // Continue game
 }
 
+
 int runGame(WINDOW* mainwin, GameState* game_state) {
     Window* playwin = Init(mainwin, 0, 0, PLAY_WIDTH, 1, 1, 1);
     Window* statwin = Init(mainwin, 0, PLAY_WIDTH + 2, STATS_WIDTH, 1, 1, 0);
-
+    int friendly_car_spawned = 0;
     // Prevent key repeat and buffer
     nodelay(playwin->win, TRUE);
     timeout(100);  // Wait for input for 100ms
@@ -202,7 +196,7 @@ int runGame(WINDOW* mainwin, GameState* game_state) {
 
     while (game_running) {
         // Update remaining time
-        int remaining_time = timer(game_state->start_time, game_state->level, game_state->bonus_time);
+        int remaining_time = timer(game_state->start_time, game_state->level);
         
         // Clear interior of windows without redrawing box
         werase(playwin->win);
@@ -212,22 +206,13 @@ int runGame(WINDOW* mainwin, GameState* game_state) {
 
         // Update stats window
         stats(statwin, remaining_time, game_state);
-        
-
-
-
-
-
-
-
-
-
+    
 
         wrefresh(statwin->win);
 
         // Game mechanics
-        spawnCars(cars, WINDOW_HEIGHT, game_state->level, &game_state->bonus_car_spawned, game_state->start_time);        
-        moveCars(cars, playwin);
+        spawnCars(cars, WINDOW_HEIGHT, game_state->level, &game_state->bonus_car_spawned, game_state->start_time, &friendly_car_spawned);
+        moveCars(cars, &frog , playwin);
         drawCars(cars, playwin);
         drawTrees(trees, playwin);
         drawFrog(&frog, playwin);

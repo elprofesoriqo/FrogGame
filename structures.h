@@ -17,6 +17,8 @@
 #define COLOR_NORMAL_CAR_1 3
 #define COLOR_NORMAL_CAR_2 4
 #define COLOR_NORMAL_CAR_3 5
+#define COLOR_FRIENDLY_CAR 6  // Add this to structures.h color definitions
+
 
 #define MAX_TREES 10
 #define COLOR_TREE COLOR_GREEN
@@ -25,7 +27,9 @@
 #define BASE_LEVEL_CARS 20
 #define CARS_PER_LEVEL 10
 
-
+#define CAR_NORMAL 0
+#define CAR_BONUS 1
+#define CAR_FRIENDLY 2
 
 typedef struct {
     int width;
@@ -42,6 +46,7 @@ typedef struct {
     int speed;
     int active;
     int color;
+    int type;
 } Car;
 
 typedef struct {
