@@ -2,6 +2,8 @@
 #include <ncurses.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
+
 
 // Game Constants
 #define WINDOW_HEIGHT 20
@@ -26,6 +28,18 @@
 #define EXTRA_TIME 30
 #define BASE_LEVEL_CARS 20
 #define CARS_PER_LEVEL 10
+
+
+typedef struct {
+    int frog_color;
+    int car_colors[3];
+    int bonus_car_color;
+    int tree_color;
+} ColorConfig;
+
+int readColorConfig(ColorConfig* config);
+int getColorFromName(const char* colorName);
+
 
 // Structs
 typedef struct {
@@ -58,10 +72,88 @@ typedef struct {
     int color;
 } Frog;
 
-// Global Variables
-int level = 1;
-int stats_x, stats_y;
-time_t start_time;
+
+typedef struct {
+    int level;
+    int total_points;
+    int bonus_car_spawned;
+    int bonus_time;
+    time_t start_time;
+} GameState;
+
+
+
+
+int getColorFromName(const char* colorName) {
+    if (strcmp(colorName, "black") == 0) return COLOR_BLACK;
+    if (strcmp(colorName, "red") == 0) return COLOR_RED;
+    if (strcmp(colorName, "green") == 0) return COLOR_GREEN;
+    if (strcmp(colorName, "yellow") == 0) return COLOR_YELLOW;
+    if (strcmp(colorName, "blue") == 0) return COLOR_BLUE;
+    if (strcmp(colorName, "magenta") == 0) return COLOR_MAGENTA;
+    if (strcmp(colorName, "cyan") == 0) return COLOR_CYAN;
+    if (strcmp(colorName, "white") == 0) return COLOR_WHITE;
+    
+    // Default to black if color not recognized
+    return COLOR_BLACK;
+}
+
+int readColorConfig(ColorConfig* config) {
+    FILE* file = fopen("input.txt", "r");
+    if (file == NULL) {
+        // If file can't be opened, return default configuration
+        config->frog_color = COLOR_GREEN;
+        config->car_colors[0] = COLOR_RED;
+        config->car_colors[1] = COLOR_BLUE;
+        config->car_colors[2] = COLOR_RED;
+        config->bonus_car_color = COLOR_YELLOW;
+        config->tree_color = COLOR_GREEN;
+        return 0;
+    }
+
+    char line[100];
+    char colorName[20];
+
+    // Read frog color
+    if (fgets(line, sizeof(line), file)) {
+        if (sscanf(line, "frog %s", colorName) == 1) {
+            config->frog_color = getColorFromName(colorName);
+        }
+    }
+
+    // Read car colors
+    if (fgets(line, sizeof(line), file)) {
+        // Default to 3 colors
+        config->car_colors[0] = COLOR_RED;
+        config->car_colors[1] = COLOR_BLUE;
+        config->car_colors[2] = COLOR_RED;
+
+        char* token = strtok(line, " \n");
+        if (token && strcmp(token, "car") == 0) {
+            int colorCount = 0;
+            while ((token = strtok(NULL, " \n")) && colorCount < 3) {
+                config->car_colors[colorCount++] = getColorFromName(token);
+            }
+        }
+    }
+
+    // Read bonus car color
+    if (fgets(line, sizeof(line), file)) {
+        if (sscanf(line, "bonus_car %s", colorName) == 1) {
+            config->bonus_car_color = getColorFromName(colorName);
+        }
+    }
+
+    // Read tree color
+    if (fgets(line, sizeof(line), file)) {
+        if (sscanf(line, "tree %s", colorName) == 1) {
+            config->tree_color = getColorFromName(colorName);
+        }
+    }
+
+    fclose(file);
+    return 1;
+}
 
 // Full function prototypes
 WINDOW* Start();
@@ -83,6 +175,17 @@ int randomSpeedBonusCar();
 void stats(int position_x, int position_y, int remaining_time);
 int timer(time_t start_time, int current_level, int middle_lane_time);
 
+
+
+void initializeGameState(GameState* game_state, int initial_level);
+int runGame(WINDOW* mainwin, GameState* game_state);
+void handleBonusCar(Frog* frog, Car* cars, int middle_lane);
+int processPlayerInput(Frog* frog, Tree* trees, int ch, int* key_state);
+void updateGameLevel(GameState* game_state, Frog* frog, Car* cars, Tree* trees, int remaining_time);
+void displayGameOverScreen(int game_over_reason, GameState* game_state);
+
+
+
 // Function Implementations
 WINDOW* Start() {
     initscr();
@@ -90,17 +193,24 @@ WINDOW* Start() {
     curs_set(0);
     start_color();
     
+    // Read color configuration
+    ColorConfig colorConfig;
+    readColorConfig(&colorConfig);
+    
     // Color Pair Initialization
-    init_pair(COLOR_FROG, COLOR_GREEN, COLOR_BLACK);
-    init_pair(COLOR_BONUS_CAR, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(COLOR_NORMAL_CAR_1, COLOR_RED, COLOR_BLACK);
-    init_pair(COLOR_NORMAL_CAR_2, COLOR_BLUE, COLOR_BLACK);
-    init_pair(COLOR_NORMAL_CAR_3, COLOR_CYAN, COLOR_BLACK);
+    init_pair(COLOR_FROG, colorConfig.frog_color, COLOR_BLACK);
+    init_pair(COLOR_BONUS_CAR, colorConfig.bonus_car_color, COLOR_BLACK);
+    init_pair(COLOR_NORMAL_CAR_1, colorConfig.car_colors[0], COLOR_BLACK);
+    init_pair(COLOR_NORMAL_CAR_2, colorConfig.car_colors[1], COLOR_BLACK);
+    init_pair(COLOR_NORMAL_CAR_3, colorConfig.car_colors[2], COLOR_BLACK);
     
     cbreak();
     keypad(stdscr, TRUE);
     return stdscr;
 }
+
+
+
 
 Window* Init(WINDOW* parent, int y, int x, int width, int color, int bo, int delay) {
     Window* W = (Window*)malloc(sizeof(Window));
@@ -152,7 +262,7 @@ void initializeTrees(Tree* trees, int playHeight) {
         int index = rand() % MAX_TREES;
         trees[index].x = 1 + rand() % (PLAY_WIDTH - 3);
         trees[index].y = 1 + rand() % (playHeight - 2);
-        trees[index].symbol = 'T';  // More tree-like symbol
+        trees[index].symbol = 'T';
         trees[index].active = 1;
         trees[index].color = COLOR_TREE;
     }
@@ -277,10 +387,18 @@ void moveFrog(Frog* frog, int ch, Tree* trees) {
     int new_x = frog->x, new_y = frog->y;
 
     switch(ch) {
-        case 'w': new_y = (frog->y > 1) ? frog->y - 1 : frog->y; break;
-        case 's': new_y = (frog->y < WINDOW_HEIGHT - 2) ? frog->y + 1 : frog->y; break;
-        case 'a': new_x = (frog->x > 1) ? frog->x - 1 : frog->x; break;
-        case 'd': new_x = (frog->x < PLAY_WIDTH - 2) ? frog->x + 1 : frog->x; break;
+        case 'w': 
+            new_y = (frog->y > 1) ? frog->y - 1 : frog->y; 
+            break;
+        case 's': 
+            new_y = (frog->y < WINDOW_HEIGHT - 2) ? frog->y + 1 : frog->y; 
+            break;
+        case 'a': 
+            new_x = (frog->x > 1) ? frog->x - 1 : frog->x; 
+            break;
+        case 'd': 
+            new_x = (frog->x < PLAY_WIDTH - 2) ? frog->x + 1 : frog->x; 
+            break;
     }
 
     // Check for tree collision
@@ -321,98 +439,161 @@ int countActiveTrees(Tree* trees) {
     return count;
 }
 
+void initializeGameState(GameState* game_state, int initial_level) {
+    game_state->level = initial_level;
+    game_state->total_points = 0;
+    game_state->bonus_car_spawned = 0;
+    game_state->bonus_time = 0;
+    game_state->start_time = time(NULL);
+}
 
-int main() {
-    WINDOW* mainwin = Start();
+int calculateLevelPoints(int remaining_time) {
+    return remaining_time > 0 ? remaining_time : 0;
+}
+
+void updateGameLevel(GameState* game_state, Frog* frog, Car* cars, Tree* trees, int remaining_time) {
+    // Calculate and add points for the level
+    int level_points = calculateLevelPoints(remaining_time);
+    game_state->total_points += level_points;
+
+    game_state->level++;
+    initFrog(frog, PLAY_WIDTH);
+    initializeCars(cars, WINDOW_HEIGHT, game_state->level);
+    initializeTrees(trees, WINDOW_HEIGHT);
+    game_state->start_time = time(NULL);
+    game_state->bonus_car_spawned = 0;
+    game_state->bonus_time = 0;  
     
+    clear();
+    mvprintw(LINES/2, COLS/2 - 10, "Next Level: %d!", game_state->level);
+    mvprintw(LINES/2 + 1, COLS/2 - 10, "Points: +%d", level_points);
+    refresh();
+    napms(500);
+    clear();
+    refresh();
+}
+
+void handleBonusCar(Frog* frog, Car* cars, int middle_lane) {
+    for (int i = 0; i < MAX_CARS; i++) {
+        if (cars[i].active &&
+            cars[i].y == middle_lane &&
+            cars[i].x == frog->x &&
+            frog->y == middle_lane) {
+
+            // Move frog up by 3 positions if possible
+            if (frog->y > 3) {
+                frog->y -= 3;
+            } else {
+                frog->y = 1;  // If not enough space, move to top
+            }
+
+            // Deactivate the bonus car
+            cars[i].active = 0;
+            break;
+        }
+    }
+    return;
+}
+
+int processPlayerInput(Frog* frog, Tree* trees, int ch, int* key_state) {
+    if (ch == 'q' || ch == 'Q') {
+        return 0;  // Signal to exit game
+    }
+
+    if (ch != ERR && key_state[ch] == 0) {
+        switch(ch) {
+            case 'w':
+            case 's':
+            case 'a':
+            case 'd':
+                moveFrog(frog, ch, trees);
+                key_state[ch] = 1;  // Mark key as pressed
+                break;
+        }
+    }
+    return 1;  // Continue game
+}
+
+int runGame(WINDOW* mainwin, GameState* game_state) {
     Window* playwin = Init(mainwin, 0, 0, PLAY_WIDTH, 1, 1, 1);
     Window* statwin = Init(mainwin, 0, PLAY_WIDTH + 2, STATS_WIDTH, 1, 1, 0);
 
+    // Prevent key repeat and buffer
+    nodelay(playwin->win, TRUE);
+    timeout(100);  // Wait for input for 100ms
+    
     // Initialize game components
     Car cars[MAX_CARS];
     Frog frog;
     Tree trees[MAX_TREES] = {0};
     
-    initializeCars(cars, WINDOW_HEIGHT, level);
+    initializeCars(cars, WINDOW_HEIGHT, game_state->level);
     initializeTrees(trees, WINDOW_HEIGHT);
     initFrog(&frog, PLAY_WIDTH);
 
-    start_time = time(NULL);
     int game_running = 1;
-    int bonus_car_spawned = 0;
-    int bonus_time = 0;  // Zmienna przechowująca dodatkowy czas
+    int key_state[256] = {0};  // Track state of each key
+    int game_over_reason = 0;  // 0: playing, 1: car collision, 2: time out
 
     while (game_running) {
-        // Clean and prepare windows
-        CleanWin(playwin, 1);
-        CleanWin(statwin, 1);
-
-        // Calculate remaining time
-        int remaining_time = timer(start_time, level, bonus_time);
+        // Update remaining time
+        int remaining_time = timer(game_state->start_time, game_state->level, game_state->bonus_time);
         
+        // Clear interior of windows without redrawing box
+        werase(playwin->win);
+        werase(statwin->win);
+        box(playwin->win, 0, 0);
+        box(statwin->win, 0, 0);
+
         // Update stats window
-        mvwprintw(statwin->win, 2, 2, "Level: %d", level);
-        mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (level - 1) * CARS_PER_LEVEL);
+        mvwprintw(statwin->win, 2, 2, "Level: %d", game_state->level);
+        mvwprintw(statwin->win, 3, 2, "Cars: %d", BASE_LEVEL_CARS + (game_state->level - 1) * CARS_PER_LEVEL);
         mvwprintw(statwin->win, 4, 2, "Trees: %d", countActiveTrees(trees));
         mvwprintw(statwin->win, 5, 2, "Time Left: %d sec", remaining_time);
+        mvwprintw(statwin->win, 6, 2, "Points: %d", game_state->total_points);
         
         wrefresh(statwin->win);
 
         // Game mechanics
-        spawnCars(cars, WINDOW_HEIGHT, level, &bonus_car_spawned);        
+        spawnCars(cars, WINDOW_HEIGHT, game_state->level, &game_state->bonus_car_spawned);        
         moveCars(cars, playwin);
         drawCars(cars, playwin);
         drawTrees(trees, playwin);
         drawFrog(&frog, playwin);
 
-        // Player input
+        // Player input handling
         int ch = wgetch(playwin->win);
-        moveFrog(&frog, ch, trees);
-
-        // Check for collision with bonus car
-        int middle_lane = WINDOW_HEIGHT / 2;
-        for (int i = 0; i < MAX_CARS; i++) {
-            if (cars[i].active &&
-                cars[i].y == middle_lane &&
-                cars[i].x == frog.x &&
-                frog.y == middle_lane) {
-
-                // Add extra time for bonus car interaction
-                bonus_time += EXTRA_TIME;
-
-                // Deactivate the bonus car
-                cars[i].active = 0;
-                break;
-            }
+        
+        // Handle player input
+        if (!processPlayerInput(&frog, trees, ch, key_state)) {
+            game_running = 0;
+            break;
         }
 
-        // Check for collision with other cars
+        // Reset key states when no key is pressed
+        if (ch == ERR) {
+            memset(key_state, 0, sizeof(key_state));
+        }
+
+        // Check for bonus car interaction
+        int middle_lane = WINDOW_HEIGHT / 2;
+        handleBonusCar(&frog, cars, middle_lane);
+
+        // Add time for bonus car
+        if (handleBonusCar) {
+            game_state->bonus_time += EXTRA_TIME;
+        }
+
+        // Check for collision with cars
         if (checkCollision(&frog, cars)) {
             game_running = 0;
+            game_over_reason = 1;  // Car collision
             break;
         }
 
         // Level progression
         if (frog.y == 1) {
-            level++;
-            initFrog(&frog, PLAY_WIDTH);
-            initializeCars(cars, WINDOW_HEIGHT, level);
-            initializeTrees(trees, WINDOW_HEIGHT);
-            start_time = time(NULL);
-            bonus_car_spawned = 0;
-            bonus_time = 0;  // Reset bonus time for the new level
-            
-            clear();
-            mvprintw(LINES/2, COLS/2 - 10, "Next Level: %d!", level);
-            refresh();
-            napms(500);
-            clear();
-            refresh();
-        }
-
-        // Quit condition
-        if (ch == 'q' || ch == 'Q') {
-            game_running = 0;
+            updateGameLevel(game_state, &frog, cars, trees, remaining_time);
         }
 
         // Refresh windows and add delay
@@ -423,15 +604,56 @@ int main() {
         // Time-out condition
         if (remaining_time <= 0) {
             game_running = 0;
+            game_over_reason = 2;  // Time out
         }
     }
 
-    // Game over screen
+    // Clean up windows
+    delwin(playwin->win);
+    delwin(statwin->win);
+    free(playwin);
+    free(statwin);
+
+    // Display game over screen
+    displayGameOverScreen(game_over_reason, game_state);
+
+    return game_running;
+}
+
+void displayGameOverScreen(int game_over_reason, GameState* game_state) {
     clear();
-    mvprintw(LINES/2 - 1, COLS/2 - 10, "Game Over!");
-    mvprintw(LINES/2, COLS/2 - 10, "Final Level: %d", level);
-    refresh();
-    getch();
+    switch(game_over_reason) {
+        case 1:  // Car collision
+            mvprintw(LINES/2 - 2, COLS/2 - 15, "GAME OVER: Car Collision!");
+            break;
+        case 2:  // Time out
+            mvprintw(LINES/2 - 2, COLS/2 - 15, "GAME OVER: Time Ran Out!");
+            break;
+        default: // Quit or other reasons
+            mvprintw(LINES/2 - 2, COLS/2 - 15, "GAME OVER!");
+            break;
+    }
+
+    mvprintw(LINES/2, COLS/2 - 10, "Final Level: %d", game_state->level);
+    mvprintw(LINES/2 + 1, COLS/2 - 10, "Total Points: %d", game_state->total_points);
+    
+    // Display countdown
+    for (int i = 5; i > 0; i--) {
+        mvprintw(LINES/2 + 2, COLS/2 - 10, "Closing in %d seconds...", i);
+        refresh();
+        napms(1000);  // 1 second delay
+    }
+}
+
+
+
+int main() {
+    WINDOW* mainwin = Start();
+    
+    GameState game_state;
+    initializeGameState(&game_state, 1);  // Start at level 1
+    
+    runGame(mainwin, &game_state);
 
     endwin();
     return 0;
