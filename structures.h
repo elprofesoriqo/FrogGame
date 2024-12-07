@@ -9,8 +9,8 @@
 #define STATS_WIDTH 30
 #define MIN_WIDTH 50
 #define MIN_HEIGHT 25
-#define MAX_CARS 20
-#define CAR_SPAWN_CHANCE 30
+#define MAX_CARS 30
+#define CAR_SPAWN_CHANCE 60
 
 #define COLOR_FROG 1
 #define COLOR_BONUS_CAR 2
@@ -20,12 +20,13 @@
 #define COLOR_FRIENDLY_CAR 6  // Add this to structures.h color definitions
 
 
-#define MAX_TREES 10
+#define MAX_TREES 20
 #define COLOR_TREE COLOR_GREEN
 #define BASE_TIME 40
 #define EXTRA_TIME 30
 #define BASE_LEVEL_CARS 20
 #define CARS_PER_LEVEL 10
+#define EXTRA_TIME 30
 
 #define CAR_NORMAL 0
 #define CAR_BONUS 1

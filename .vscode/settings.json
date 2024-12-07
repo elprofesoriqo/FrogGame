@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "structures.h": "c",
+        "window.h": "c",
+        "cars_trees.h": "c",
+        "fileprocessing.h": "c"
+    }
+}

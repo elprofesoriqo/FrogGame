@@ -25,22 +25,13 @@ int getColorFromName(const char* colorName) {
     if (strcmp(colorName, "white") == 0) return COLOR_WHITE;
     
     // Default to black if color not recognized
-    return COLOR_BLACK;
+    return COLOR_WHITE;
 }
+#include <stdio.h>
+#include <string.h>
 
-int readColorConfig(ColorConfig* config) {
-    FILE* file = fopen("input.txt", "r");
-    if (file == NULL) {
-        // If file can't be opened, return default configuration
-        config->frog_color = COLOR_GREEN;
-        config->car_colors[0] = COLOR_RED;
-        config->car_colors[1] = COLOR_BLUE;
-        config->car_colors[2] = COLOR_RED;
-        config->bonus_car_color = COLOR_YELLOW;
-        config->tree_color = COLOR_GREEN;
-        return 0;
-    }
-
+// Funkcja do parsowania konfiguracji z pliku
+int parseColorConfig(FILE* file, ColorConfig* config) {
     char line[100];
     char colorName[20];
 
@@ -53,7 +44,7 @@ int readColorConfig(ColorConfig* config) {
 
     // Read car colors
     if (fgets(line, sizeof(line), file)) {
-        // Default to 3 colors
+        // Set defaults
         config->car_colors[0] = COLOR_RED;
         config->car_colors[1] = COLOR_BLUE;
         config->car_colors[2] = COLOR_RED;
@@ -81,8 +72,28 @@ int readColorConfig(ColorConfig* config) {
         }
     }
 
+    return 1; // Return success
+}
+
+// Funkcja odpowiedzialna za odczyt pliku i delegację do parsera
+int readColorConfig(ColorConfig* config) {
+    FILE* file = fopen("input.txt", "r");
+    if (file == NULL) {
+        // If file can't be opened, return default configuration
+        config->frog_color = COLOR_GREEN;
+        config->car_colors[0] = COLOR_RED;
+        config->car_colors[1] = COLOR_BLUE;
+        config->car_colors[2] = COLOR_RED;
+        config->bonus_car_color = COLOR_YELLOW;
+        config->tree_color = COLOR_GREEN;
+        return 0;
+    }
+
+    // Parse configuration
+    int result = parseColorConfig(file, config);
+
     fclose(file);
-    return 1;
+    return result;
 }
 
 
