@@ -1,4 +1,4 @@
-if [ -f zaba ]; then
+if [ -f frog ]; then
 	rm frog
 fi
 

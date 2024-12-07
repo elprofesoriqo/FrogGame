@@ -1,3 +1,5 @@
+//using from demo game window structure & function 
+
 #include <stdio.h>
 #include <ncurses.h>
 #include <stdlib.h>
@@ -5,7 +7,7 @@
 #include <string.h>
 
 
-//Files
+//pliki
 #include "structures.h"
 #include "window.h"
 #include "fileprocessing.h"

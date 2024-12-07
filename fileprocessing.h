@@ -24,27 +24,25 @@ int getColorFromName(const char* colorName) {
     if (strcmp(colorName, "cyan") == 0) return COLOR_CYAN;
     if (strcmp(colorName, "white") == 0) return COLOR_WHITE;
     
-    // Default to black if color not recognized
     return COLOR_WHITE;
 }
-#include <stdio.h>
-#include <string.h>
 
-// Funkcja do parsowania konfiguracji z pliku
+
+
 int parseColorConfig(FILE* file, ColorConfig* config) {
     char line[100];
     char colorName[20];
 
-    // Read frog color
+    // frog kolors
     if (fgets(line, sizeof(line), file)) {
         if (sscanf(line, "frog %s", colorName) == 1) {
             config->frog_color = getColorFromName(colorName);
         }
     }
 
-    // Read car colors
+    // car kolors
     if (fgets(line, sizeof(line), file)) {
-        // Set defaults
+        //  def
         config->car_colors[0] = COLOR_RED;
         config->car_colors[1] = COLOR_BLUE;
         config->car_colors[2] = COLOR_RED;
@@ -58,28 +56,26 @@ int parseColorConfig(FILE* file, ColorConfig* config) {
         }
     }
 
-    // Read bonus car color
+    // bonus car kolor
     if (fgets(line, sizeof(line), file)) {
         if (sscanf(line, "bonus_car %s", colorName) == 1) {
             config->bonus_car_color = getColorFromName(colorName);
         }
     }
 
-    // Read tree color
+    // tree kolor
     if (fgets(line, sizeof(line), file)) {
         if (sscanf(line, "tree %s", colorName) == 1) {
             config->tree_color = getColorFromName(colorName);
         }
     }
 
-    return 1; // Return success
+    return 1;
 }
 
-// Funkcja odpowiedzialna za odczyt pliku i delegację do parsera
 int readColorConfig(ColorConfig* config) {
     FILE* file = fopen("input.txt", "r");
     if (file == NULL) {
-        // If file can't be opened, return default configuration
         config->frog_color = COLOR_GREEN;
         config->car_colors[0] = COLOR_RED;
         config->car_colors[1] = COLOR_BLUE;
@@ -89,7 +85,6 @@ int readColorConfig(ColorConfig* config) {
         return 0;
     }
 
-    // Parse configuration
     int result = parseColorConfig(file, config);
 
     fclose(file);
@@ -97,7 +92,6 @@ int readColorConfig(ColorConfig* config) {
 }
 
 
-// Function to save score to leaderboard
 void saveToLeaderboard(int points, int level) {
     FILE* file = fopen(LEADERBOARD_FILE, "a+");
     if (file == NULL) {
@@ -105,13 +99,12 @@ void saveToLeaderboard(int points, int level) {
         return;
     }
 
-    // Get current time
     time_t current_time;
     struct tm* time_info;
     time(&current_time);
     time_info = localtime(&current_time);
 
-    // Format: points level timestamp
+    // Format
     fprintf(file, "%d %d %04d-%02d-%02d %02d:%02d:%02d\n", 
         points, 
         level,
@@ -125,7 +118,7 @@ void saveToLeaderboard(int points, int level) {
     fclose(file);
 }
 
-// Function to read leaderboard entries
+
 int readLeaderboardEntries(LeaderboardEntry* entries) {
     FILE* file = fopen(LEADERBOARD_FILE, "r");
     if (file == NULL) {

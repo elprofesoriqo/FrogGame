@@ -1,4 +1,4 @@
-frog red
-car green blue white
+frog green
+car red blue white
 bonus_car yellow
-tree brown
+tree magenta

@@ -3,7 +3,7 @@
 #include <time.h>
 #include <ncurses.h>
 
-// Game Constants
+// stałe gry
 #define WINDOW_HEIGHT 20
 #define PLAY_WIDTH 40
 #define STATS_WIDTH 30
@@ -12,22 +12,24 @@
 #define MAX_CARS 30
 #define CAR_SPAWN_CHANCE 60
 
+// stałe kolory
 #define COLOR_FROG 1
 #define COLOR_BONUS_CAR 2
 #define COLOR_NORMAL_CAR_1 3
 #define COLOR_NORMAL_CAR_2 4
 #define COLOR_NORMAL_CAR_3 5
-#define COLOR_FRIENDLY_CAR 6  // Add this to structures.h color definitions
+#define COLOR_FRIENDLY_CAR 1
+#define COLOR_TREE 6
 
-
+// wartości gry
 #define MAX_TREES 20
-#define COLOR_TREE COLOR_GREEN
 #define BASE_TIME 40
 #define EXTRA_TIME 30
 #define BASE_LEVEL_CARS 20
 #define CARS_PER_LEVEL 10
 #define EXTRA_TIME 30
 
+// rodzaje aut
 #define CAR_NORMAL 0
 #define CAR_BONUS 1
 #define CAR_FRIENDLY 2

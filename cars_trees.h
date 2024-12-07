@@ -16,7 +16,7 @@
 void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, time_t start_time, int* friendly_car_spawned);
 int randomSpeed(int level);
 
-
+// stworzneie aut
 void initializeCars(Car* cars, int playHeight, int currentLevel) {
     srand(time(NULL));
     int total_cars = BASE_LEVEL_CARS + (currentLevel - 1) * CARS_PER_LEVEL;
@@ -64,7 +64,7 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, tim
         for (int i = 0; i < total_cars; i++) {
             if (!cars[i].active) {
                 cars[i].x = PLAY_WIDTH - 2;
-                cars[i].y = middle_lane; // Middle lane only
+                cars[i].y = middle_lane; // tylko środkowa linia
                 cars[i].speed = 1;
                 cars[i].color = COLOR_BONUS_CAR;
                 cars[i].type = CAR_BONUS;
@@ -75,17 +75,17 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, tim
         }
     }
 
-    // Friendly car spawning (one per level on levels > 2)
-    if (level > 2 && !*friendly_car_spawned && rand() % 100 < 10) {
+    // Friendly car spawning
+    if (!*friendly_car_spawned && rand() % 100 < 10) {
         for (int i = 0; i < total_cars; i++) {
             if (!cars[i].active) {
                 cars[i].x = PLAY_WIDTH - 2;
                 cars[i].y = 1 + rand() % (playHeight - 2);
-                cars[i].speed = 1;  // Very slow
+                cars[i].speed = 1;  // wolny
                 cars[i].color = COLOR_FRIENDLY_CAR;
                 cars[i].type = CAR_FRIENDLY;
                 cars[i].active = 1;
-                *friendly_car_spawned = 1; // Mark friendly car as spawned
+                *friendly_car_spawned = 1;
                 break;
             }
         }
@@ -96,11 +96,17 @@ void spawnCars(Car* cars, int playHeight, int level, int* bonus_car_spawned, tim
 void moveCars(Car* cars, Frog* frog, Window* playwin) {
     for (int i = 0; i < MAX_CARS; i++) {
         if (cars[i].active) {
+            // zwiększenie prędkości auta podczas gry
+            if (rand() % 1000 == 0) {
+                cars[i].speed += 1;
+            }
+
+
+
             // Friendly car logic
             if (cars[i].type == CAR_FRIENDLY) {
-                // Check if frog is in the same lane
                 if (cars[i].y == frog->y) {
-                    // Stop if too close to frog
+                    // Stop
                     if (abs(cars[i].x - frog->x) > 3) {
                         cars[i].x -= cars[i].speed;
                     }
@@ -108,7 +114,7 @@ void moveCars(Car* cars, Frog* frog, Window* playwin) {
                     cars[i].x -= cars[i].speed;
                 }
             } else {
-                // Normal car movement
+                // Normal car
                 cars[i].x -= cars[i].speed;
             }
             
@@ -119,6 +125,7 @@ void moveCars(Car* cars, Frog* frog, Window* playwin) {
     }
 }
 
+//wyświetlanie aut
 void drawCars(Car* cars, Window* playwin) {
     for (int i = 0; i < MAX_CARS; i++) {
         if (cars[i].active) {
@@ -137,25 +144,25 @@ int randomSpeed(int level) {
 }
 
 int randomSpeedBonusCar() {
-    int base_speed = 1;  // Increased base speed scaling
+    int base_speed = 1;
     int max_speed = 2;
     return base_speed + rand() % (max_speed - base_speed + 1);
 }
 
 
 //trees
-
 void initializeTrees(Tree* trees, int playHeight) {
     srand(time(NULL));
     for (int i = 0; i < MAX_TREES; i++) {
         trees[i].active = 0;  // Reset all trees
     }
     
-    int trees_to_place = 3 + rand() % 10;  // 3-5 trees
+    int trees_to_place = 3 + rand() % 10;  // 3-10 
     for (int i = 0; i < trees_to_place; i++) {
         int index = rand() % MAX_TREES;
         trees[index].x = 1 + rand() % (PLAY_WIDTH - 3);
-        trees[index].y = (1 + rand() % (playHeight - 2) == playHeight / 2) ? 1 + rand() % (playHeight - 2) + 1 :1 + rand() % (playHeight - 2);;
+        // nie mogą być na bonus car pas - middle
+        trees[index].y = 1 + rand() % (playHeight - 2);
         trees[index].symbol = 'T';
         trees[index].active = 1;
         trees[index].color = COLOR_TREE;
@@ -190,7 +197,7 @@ void handleBonusCar(Frog* frog, Car* cars, int middle_lane) {
                 frog->y = 1;
             }
 
-            //jest on tylko 1 na lvl
+            //jest on tylko 1 na dany lvl
             cars[i].active = 0;
             break;
         }

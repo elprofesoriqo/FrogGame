@@ -1,3 +1,6 @@
+//using from demo game window structure % function 
+
+
 #ifndef window_h
 #define window_h
 #include <stdio.h>
@@ -13,25 +16,27 @@
 
 Window* Init(WINDOW* parent, int y, int x, int width, int color, int bo, int delay);
 void CleanWin(Window* W, int bo);
-// Function Implementations
+
+
+
 WINDOW* Start() {
     initscr();
     noecho();
     curs_set(0);
     start_color();
     
-    // Read color configuration
+    // kolory
     ColorConfig colorConfig;
     readColorConfig(&colorConfig);
     
-    // Color Pair Initialization
     init_pair(COLOR_FROG, colorConfig.frog_color, COLOR_BLACK);
     init_pair(COLOR_BONUS_CAR, colorConfig.bonus_car_color, COLOR_BLACK);
     init_pair(COLOR_NORMAL_CAR_1, colorConfig.car_colors[0], COLOR_BLACK);
     init_pair(COLOR_NORMAL_CAR_2, colorConfig.car_colors[1], COLOR_BLACK);
     init_pair(COLOR_NORMAL_CAR_3, colorConfig.car_colors[2], COLOR_BLACK);
     init_pair(COLOR_FRIENDLY_CAR, colorConfig.frog_color, COLOR_BLACK);
-    
+    init_pair(COLOR_TREE, colorConfig.tree_color, COLOR_BLACK);
+
     cbreak();
     keypad(stdscr, TRUE);
     return stdscr;
